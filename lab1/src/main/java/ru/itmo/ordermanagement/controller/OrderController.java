@@ -13,10 +13,6 @@ import ru.itmo.ordermanagement.service.OrderService;
 
 import java.util.List;
 
-/**
- * REST API для управления заказами.
- * Реализует публичные интерфейсы для всех участников BPMN-процесса.
- */
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
@@ -24,8 +20,6 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
-
-    // ==================== ЗАКАЗЧИК ====================
 
     @PostMapping
     @Operation(summary = "Создать заказ",
@@ -40,8 +34,6 @@ public class OrderController {
     public ResponseEntity<List<OrderResponse>> getOrdersByCustomer(@PathVariable Long customerId) {
         return ResponseEntity.ok(orderService.getOrdersByCustomer(customerId));
     }
-
-    // ==================== ПРОДАВЕЦ ====================
 
     @PostMapping("/{orderId}/review")
     @Operation(summary = "Проверить заказ (решение продавца)",
@@ -73,8 +65,6 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrdersBySeller(sellerId));
     }
 
-    // ==================== КУРЬЕР ====================
-
     @PostMapping("/{orderId}/courier/{courierId}/accept")
     @Operation(summary = "Курьер принял запрос на доставку",
             description = "BPMN: Курьер → 'Принял запрос на доставку'.")
@@ -99,8 +89,6 @@ public class OrderController {
     public ResponseEntity<List<OrderResponse>> getOrdersByCourier(@PathVariable Long courierId) {
         return ResponseEntity.ok(orderService.getOrdersByCourier(courierId));
     }
-
-    // ==================== ОБЩИЕ ====================
 
     @GetMapping("/{orderId}")
     @Operation(summary = "Получить заказ по ID")

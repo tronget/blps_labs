@@ -19,9 +19,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByCourierId(Long courierId);
 
-    /** Заказы, где продавец не реагирует в течение заданного времени */
     List<Order> findByStatusAndSellerNotifiedAtBefore(OrderStatus status, LocalDateTime deadline);
 
-    /** Заказы, где курьер не пришёл к назначенному времени */
     List<Order> findByStatusAndCourierAssignedAtBefore(OrderStatus status, LocalDateTime deadline);
 }

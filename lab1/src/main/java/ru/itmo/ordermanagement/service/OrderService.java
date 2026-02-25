@@ -15,25 +15,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Основной сервис бизнес-процесса управления заказами.
- *
- * Реализует BPMN-диаграмму:
- *
- * 1. Заказчик: Создать заказ (CREATED)
- * 2. Продавец получает уведомление → Проверить заказ (IN_PROCESSING)
- * 3. Продавец: Возможно ли выполнить?
- *    - Да → Передать на приготовление (COOKING)
- *    - Нет → Отменить заказ (CANCELLED)
- * 4. Продавец: Собрать заказ (ASSEMBLING)
- * 5. Продавец: Искать курьера (SEARCHING_COURIER)
- * 6. Курьер: Принял запрос на доставку (AWAITING_COURIER)
- * 7. Курьер: Пришёл в заведение → Передать заказ курьеру (IN_DELIVERY)
- *
- * Таймеры:
- * - Продавец не реагирует 10 минут → авто-отмена
- * - Курьер не пришёл к назначенному времени → статус DELAYED
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -45,14 +26,6 @@ public class OrderService {
     private final CourierRepository courierRepository;
     private final NotificationService notificationService;
 
-    // ==================== ЗАКАЗЧИК ====================
-
-    /**
-     * Шаг 1 BPMN: Заказчик → "Создать заказ".
-     * Товары собраны в корзине покупателя → создаётся заказ.
-     * Продавец получает уведомление.
-     * Заказчик получает уведомление: "Изменён статус заказа: В обработке".
-     */
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
         Customer customer = customerRepository.findById(request.getCustomerId())
@@ -69,7 +42,6 @@ public class OrderService {
                 .status(OrderStatus.IN_PROCESSING)
                 .build();
 
-        // Добавить позиции заказа
         for (OrderItemDto itemDto : request.getItems()) {
             OrderItem item = OrderItem.builder()
                     .productName(itemDto.getProductName())
@@ -83,42 +55,24 @@ public class OrderService {
 
         order = orderRepository.save(order);
 
-        // Уведомление продавцу о новом заказе
         notificationService.notifySellerNewOrder(order);
-
-        // Уведомление заказчику: статус "В обработке"
         notificationService.notifyCustomerStatusChanged(order);
 
         log.info("Order #{} created, status: IN_PROCESSING", order.getId());
         return toResponse(order);
     }
 
-    // ==================== ПРОДАВЕЦ ====================
-
-    /**
-     * Шаг 2-3 BPMN: Продавец → "Проверить заказ" → "Возможно ли выполнить заказ?"
-     *
-     * Если да (canFulfill=true):
-     *   → Передать заказ на приготовление (COOKING)
-     *   → Заказчику уведомление: "Готовится"
-     *
-     * Если нет (canFulfill=false):
-     *   → Отменить заказ (CANCELLED)
-     *   → Заказчику уведомление: "Заказ отменён"
-     */
     @Transactional
     public OrderResponse reviewOrder(Long orderId, ReviewOrderRequest request) {
         Order order = findOrderOrThrow(orderId);
         assertStatus(order, OrderStatus.IN_PROCESSING);
 
         if (request.isCanFulfill()) {
-            // Да → Передать заказ на приготовление
             order.setStatus(OrderStatus.COOKING);
             order = orderRepository.save(order);
             notificationService.notifyCustomerStatusChanged(order);
             log.info("Order #{} accepted by seller, status: COOKING", orderId);
         } else {
-            // Нет → Отменить заказ
             order.setStatus(OrderStatus.CANCELLED);
             order.setCancelledAt(LocalDateTime.now());
             order.setCancelReason(request.getCancelReason() != null
@@ -132,11 +86,6 @@ public class OrderService {
         return toResponse(order);
     }
 
-    /**
-     * Шаг 4 BPMN: Продавец → "Собрать заказ".
-     * COOKING → ASSEMBLING.
-     * Заказчику уведомление: "В сборке".
-     */
     @Transactional
     public OrderResponse assembleOrder(Long orderId) {
         Order order = findOrderOrThrow(orderId);
@@ -150,11 +99,6 @@ public class OrderService {
         return toResponse(order);
     }
 
-    /**
-     * Шаг 5 BPMN: Продавец → "Искать курьера".
-     * ASSEMBLING → SEARCHING_COURIER.
-     * Ищем свободного курьера, если находим — назначаем и уведомляем.
-     */
     @Transactional
     public OrderResponse searchCourier(Long orderId) {
         Order order = findOrderOrThrow(orderId);
@@ -163,7 +107,6 @@ public class OrderService {
         order.setStatus(OrderStatus.SEARCHING_COURIER);
         order = orderRepository.save(order);
 
-        // Попробовать найти свободного курьера
         final Order savedOrder = order;
         courierRepository.findFirstByAvailableTrue().ifPresent(courier -> {
             assignCourier(savedOrder, courier);
@@ -172,11 +115,6 @@ public class OrderService {
         return toResponse(orderRepository.findById(orderId).orElseThrow());
     }
 
-    /**
-     * Назначить курьера на заказ (внутренний метод).
-     * SEARCHING_COURIER → AWAITING_COURIER.
-     * Курьеру уведомление: "Уведомление о новом заказе".
-     */
     @Transactional
     public void assignCourier(Order order, Courier courier) {
         courier.setAvailable(false);
@@ -188,18 +126,11 @@ public class OrderService {
         order.setCourierNotifiedAt(LocalDateTime.now());
         orderRepository.save(order);
 
-        // Уведомление курьеру
         notificationService.notifyCourierNewDelivery(order);
         log.info("Order #{}: courier #{} assigned, status: AWAITING_COURIER",
                 order.getId(), courier.getId());
     }
 
-    // ==================== КУРЬЕР ====================
-
-    /**
-     * Шаг 6 BPMN: Курьер → "Принял запрос на доставку".
-     * Это подтверждение от курьера (уже назначен, просто подтверждает).
-     */
     @Transactional
     public OrderResponse courierAcceptDelivery(Long orderId, Long courierId) {
         Order order = findOrderOrThrow(orderId);
@@ -210,17 +141,10 @@ public class OrderService {
                     "Courier #" + courierId + " is not assigned to order #" + orderId);
         }
 
-        // Курьер подтвердил — статус не меняется, ждём прихода
         log.info("Order #{}: courier #{} accepted delivery request", orderId, courierId);
         return toResponse(order);
     }
 
-    /**
-     * Шаг 7 BPMN: Курьер → "Курьер пришёл в заведение".
-     * Продавец → "Передать заказ курьеру".
-     * AWAITING_COURIER → IN_DELIVERY.
-     * Заказчику уведомление: "В доставке".
-     */
     @Transactional
     public OrderResponse courierArrived(Long orderId, Long courierId) {
         Order order = findOrderOrThrow(orderId);
@@ -244,8 +168,6 @@ public class OrderService {
         log.info("Order #{}: courier arrived, status: IN_DELIVERY", orderId);
         return toResponse(order);
     }
-
-    // ==================== ОБЩИЕ МЕТОДЫ ====================
 
     public OrderResponse getOrder(Long orderId) {
         return toResponse(findOrderOrThrow(orderId));
@@ -276,12 +198,6 @@ public class OrderService {
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ==================== ТАЙМЕРЫ (вызываются из Scheduler) ====================
-
-    /**
-     * Таймер BPMN: "Продавец не реагирует в течение 10 минут".
-     * Если заказ в статусе IN_PROCESSING и прошло больше N минут — отменяем.
-     */
     @Transactional
     public void cancelOverdueOrders(int timeoutMinutes) {
         LocalDateTime deadline = LocalDateTime.now().minusMinutes(timeoutMinutes);
@@ -299,10 +215,6 @@ public class OrderService {
         }
     }
 
-    /**
-     * Таймер BPMN: "Курьер не пришёл к назначенному времени".
-     * Если заказ в статусе AWAITING_COURIER и прошло больше N минут — помечаем DELAYED.
-     */
     @Transactional
     public void markDelayedOrders(int timeoutMinutes) {
         LocalDateTime deadline = LocalDateTime.now().minusMinutes(timeoutMinutes);
@@ -317,8 +229,6 @@ public class OrderService {
             log.warn("Order #{} marked as DELAYED: courier timeout ({} min)", order.getId(), timeoutMinutes);
         }
     }
-
-    // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 
     private Order findOrderOrThrow(Long orderId) {
         return orderRepository.findById(orderId)

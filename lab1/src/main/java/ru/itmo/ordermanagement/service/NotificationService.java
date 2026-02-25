@@ -13,11 +13,7 @@ import ru.itmo.ordermanagement.repository.NotificationRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Сервис уведомлений.
- * Обеспечивает отправку уведомлений участникам бизнес-процесса
- * (заказчику, продавцу, курьеру) при смене статуса заказа.
- */
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,9 +21,6 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
 
-    /**
-     * Отправить уведомление.
-     */
     @Transactional
     public Notification send(RecipientType recipientType, Long recipientId,
                              Order order, String message) {
@@ -43,9 +36,6 @@ public class NotificationService {
         return notification;
     }
 
-    /**
-     * Уведомить заказчика о смене статуса заказа.
-     */
     @Transactional
     public void notifyCustomerStatusChanged(Order order) {
         String message = String.format("Изменён статус заказа #%d: \"%s\"",
@@ -53,9 +43,6 @@ public class NotificationService {
         send(RecipientType.CUSTOMER, order.getCustomer().getId(), order, message);
     }
 
-    /**
-     * Уведомить продавца о новом заказе.
-     */
     @Transactional
     public void notifySellerNewOrder(Order order) {
         String message = String.format("Новый заказ #%d от покупателя %s",
@@ -63,9 +50,6 @@ public class NotificationService {
         send(RecipientType.SELLER, order.getSeller().getId(), order, message);
     }
 
-    /**
-     * Уведомить курьера о новом заказе на доставку.
-     */
     @Transactional
     public void notifyCourierNewDelivery(Order order) {
         String message = String.format("Уведомление о новом заказе #%d. Адрес заведения: %s",
@@ -73,9 +57,6 @@ public class NotificationService {
         send(RecipientType.COURIER, order.getCourier().getId(), order, message);
     }
 
-    /**
-     * Получить все уведомления получателя.
-     */
     public List<NotificationResponse> getNotifications(RecipientType recipientType, Long recipientId) {
         return notificationRepository
                 .findByRecipientTypeAndRecipientIdOrderByCreatedAtDesc(recipientType, recipientId)
@@ -84,9 +65,6 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Получить непрочитанные уведомления получателя.
-     */
     public List<NotificationResponse> getUnreadNotifications(RecipientType recipientType, Long recipientId) {
         return notificationRepository
                 .findByRecipientTypeAndRecipientIdAndIsReadFalseOrderByCreatedAtDesc(recipientType, recipientId)
@@ -95,9 +73,6 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Отметить уведомление как прочитанное.
-     */
     @Transactional
     public void markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)

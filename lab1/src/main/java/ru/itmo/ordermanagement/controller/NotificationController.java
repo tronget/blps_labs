@@ -11,10 +11,6 @@ import ru.itmo.ordermanagement.service.NotificationService;
 
 import java.util.List;
 
-/**
- * REST API для работы с уведомлениями.
- * Уведомления генерируются автоматически при смене статуса заказа.
- */
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor

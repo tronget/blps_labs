@@ -7,9 +7,6 @@ import lombok.Data;
 
 import java.util.List;
 
-/**
- * DTO для создания заказа (действие заказчика: "Создать заказ").
- */
 @Data
 public class CreateOrderRequest {
 

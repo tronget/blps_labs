@@ -9,6 +9,5 @@ import java.util.Optional;
 @Repository
 public interface CourierRepository extends JpaRepository<Courier, Long> {
 
-    /** Найти первого доступного курьера */
     Optional<Courier> findFirstByAvailableTrue();
 }

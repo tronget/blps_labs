@@ -8,9 +8,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * DTO для ответа с информацией о заказе.
- */
 @Data
 @Builder
 public class OrderResponse {

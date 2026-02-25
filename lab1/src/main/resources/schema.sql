@@ -1,7 +1,3 @@
--- ============================================================
--- Schema for Order Management BPMN process
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS customers (
     id              BIGSERIAL PRIMARY KEY,
     name            VARCHAR(255) NOT NULL,
@@ -52,7 +48,7 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 CREATE TABLE IF NOT EXISTS notifications (
     id              BIGSERIAL PRIMARY KEY,
-    recipient_type  VARCHAR(50) NOT NULL,   -- CUSTOMER, SELLER, COURIER
+    recipient_type  VARCHAR(50) NOT NULL,
     recipient_id    BIGINT NOT NULL,
     order_id        BIGINT NOT NULL REFERENCES orders(id),
     message         TEXT NOT NULL,
@@ -60,7 +56,6 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at      TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- Index for faster queries
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_seller ON orders(seller_id);
